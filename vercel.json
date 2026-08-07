@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/create-badge",
-      "schedule": "29 15 * * *"
+      "schedule": "33 21 * * *"
     }
   ]
 }
