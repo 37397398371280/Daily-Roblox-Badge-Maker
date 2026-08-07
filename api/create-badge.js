@@ -2,7 +2,7 @@ import axios from 'axios';
 import FormData from 'form-data';
 
 export default async function handler(req, res) {
-  // Safe helper that works on Express, Vercel, and raw Node.js HTTP servers
+  // Helper to ensure compatibility with Vercel and standard Node.js HTTP responses
   const sendJson = (statusCode, data) => {
     if (typeof res.status === 'function') {
       return res.status(statusCode).json(data);
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 2. Environment Variables Check
+    // 2. Validate Environment Variables
     const API_KEY = process.env.ROBLOX_API_KEY;
     const UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
     const CRON_SECRET = process.env.CRON_SECRET;
@@ -53,33 +53,52 @@ export default async function handler(req, res) {
     form.append('paymentSourceType', 'User');
     form.append('image', samplePngBuffer, { filename: 'badge.png', contentType: 'image/png' });
 
-    const badgeRes = await axios.post(
-      `https://apis.roblox.com/legacy-badges/v1/universes/${UNIVERSE_ID}/badges`,
-      form,
-      {
-        headers: {
-          'x-api-key': API_KEY,
-          ...form.getHeaders()
+    let badgeRes;
+    try {
+      badgeRes = await axios.post(
+        `https://apis.roblox.com/legacy-badges/v1/universes/${UNIVERSE_ID}/badges`,
+        form,
+        {
+          headers: {
+            'x-api-key': API_KEY,
+            ...form.getHeaders()
+          }
         }
-      }
-    );
+      );
+    } catch (badgeErr) {
+      return sendJson(400, {
+        error: 'Roblox Badge API Request Failed',
+        status: badgeErr.response?.status,
+        details: badgeErr.response?.data || badgeErr.message
+      });
+    }
 
     const badgeId = badgeRes.data.id;
 
-    // 6. Save Badge ID into DataStore via Roblox Open Cloud API
+    // 6. Save Badge ID into Roblox DataStore via Open Cloud API
     const dsUrl = `https://apis.roblox.com/datastores/v1/universes/${UNIVERSE_ID}/standard-datastores/datastore/entries/entry?datastoreName=DailyBadgeDS&entryKey=CurrentBadgeId`;
 
-    await axios.post(
-      dsUrl,
-      JSON.stringify(badgeId),
-      {
-        headers: {
-          'x-api-key': API_KEY,
-          'Content-Type': 'application/json'
+    try {
+      await axios.post(
+        dsUrl,
+        JSON.stringify(badgeId),
+        {
+          headers: {
+            'x-api-key': API_KEY,
+            'Content-Type': 'application/json'
+          }
         }
-      }
-    );
+      );
+    } catch (dsErr) {
+      return sendJson(400, {
+        error: 'Roblox DataStore API Request Failed',
+        status: dsErr.response?.status,
+        badgeIdCreated: badgeId,
+        details: dsErr.response?.data || dsErr.message
+      });
+    }
 
+    // 7. Success Response
     return sendJson(200, {
       success: true,
       badgeId: badgeId,
@@ -88,7 +107,7 @@ export default async function handler(req, res) {
 
   } catch (err) {
     return sendJson(500, {
-      error: 'Unhandled Internal Error',
+      error: 'Unhandled Server Error',
       details: err.response?.data || err.message
     });
   }
