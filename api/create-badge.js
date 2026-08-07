@@ -2,18 +2,17 @@ import axios from 'axios';
 import FormData from 'form-data';
 
 export default async function handler(req, res) {
-  // Helper function to safely send JSON responses on both Vercel & raw Node.js HTTP servers
+  // Safe helper that works on Express, Vercel, and raw Node.js HTTP servers
   const sendJson = (statusCode, data) => {
     if (typeof res.status === 'function') {
       return res.status(statusCode).json(data);
-    } else {
-      res.statusCode = statusCode;
-      res.setHeader('Content-Type', 'application/json');
-      return res.end(JSON.stringify(data));
     }
+    res.statusCode = statusCode;
+    res.setHeader('Content-Type', 'application/json');
+    return res.end(JSON.stringify(data));
   };
 
-  // Ignore favicon requests
+  // 1. Ignore browser favicon requests
   if (req.url && (req.url.includes('favicon.ico') || req.url.includes('favicon.png'))) {
     if (typeof res.status === 'function') return res.status(204).end();
     res.statusCode = 204;
@@ -21,6 +20,7 @@ export default async function handler(req, res) {
   }
 
   try {
+    // 2. Environment Variables Check
     const API_KEY = process.env.ROBLOX_API_KEY;
     const UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
     const CRON_SECRET = process.env.CRON_SECRET;
@@ -32,6 +32,7 @@ export default async function handler(req, res) {
       });
     }
 
+    // 3. Security Header Check
     const secretHeader = req.headers['x-cron-secret'];
     if (secretHeader !== CRON_SECRET) {
       return sendJson(401, { error: 'Unauthorized: Invalid x-cron-secret header.' });
@@ -39,13 +40,13 @@ export default async function handler(req, res) {
 
     const dateStr = new Date().toISOString().split('T')[0];
 
-    // 512x512 PNG Buffer
+    // 4. Sample 512x512 transparent PNG image buffer for Roblox Badge
     const samplePngBuffer = Buffer.from(
       'iVBORw0KGgoAAAANSUhEUgAAAgAAAAICCAYAAACm/UfGAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAXSURBVHhe7cEBDQAAAMKg90t1hkUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD4GQYgAAGJ4s1cAAAAAElFTkSuQmCC',
       'base64'
     );
 
-    // 1. Create Badge via Roblox Open Cloud API
+    // 5. Create Badge via Roblox Open Cloud API
     const form = new FormData();
     form.append('name', `Daily Badge - ${dateStr}`);
     form.append('description', `Logged in on ${dateStr}!`);
@@ -65,7 +66,7 @@ export default async function handler(req, res) {
 
     const badgeId = badgeRes.data.id;
 
-    // 2. Save Badge ID to Roblox DataStore via Open Cloud API
+    // 6. Save Badge ID into DataStore via Roblox Open Cloud API
     const dsUrl = `https://apis.roblox.com/datastores/v1/universes/${UNIVERSE_ID}/standard-datastores/datastore/entries/entry?datastoreName=DailyBadgeDS&entryKey=CurrentBadgeId`;
 
     await axios.post(
