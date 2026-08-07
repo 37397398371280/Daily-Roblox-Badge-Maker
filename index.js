@@ -1,3 +1,6 @@
+// index.js
 export default function handler(req, res) {
-  res.status(200).send("Roblox Badge API is active. Access endpoints via /api/create-badge");
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'text/plain');
+  res.end("Roblox Badge API is active. Access endpoints via /api/create-badge");
 }
